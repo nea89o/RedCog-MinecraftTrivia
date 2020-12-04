@@ -1,16 +1,17 @@
 {
-  "short": "Minecraft trivia minigames",
-  "author": [
-    "romangraef89"
-  ],
-  "required_cogs": {},
-  "requirements": [],
-  "tags": [
-    "minecraft",
-    "minigame"
-  ],
-  "min_bot_version": "3.3.10",
-  "hidden": false,
-  "disabled": false,
-  "type": "COG"
+	"name": "MinecraftTrivia",
+	"short": "Minecraft trivia minigames",
+	"author": [
+		"romangraef89"
+	],
+	"required_cogs": {},
+	"requirements": [],
+	"tags": [
+		"minecraft",
+		"minigame"
+	],
+	"min_bot_version": "3.3.10",
+	"hidden": false,
+	"disabled": false,
+	"type": "COG"
 }

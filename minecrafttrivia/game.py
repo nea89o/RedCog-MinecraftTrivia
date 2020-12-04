@@ -6,7 +6,9 @@ from datetime import datetime, timedelta
 from enum import Enum, auto
 
 import discord
+from redbot.core import Config
 from redbot.core.bot import Red
+from redbot.core.config import Group
 
 from . import constants, utils
 from .recipe_provider import DEFAULT_RECIPE_PROVIDER
@@ -25,9 +27,10 @@ class OngoingGame(ABC):
 	phase: GamePhase
 	signup_message: discord.Message
 
-	def __init__(self, bot: Red, channel: discord.TextChannel):
+	def __init__(self, bot: Red, config: Config, channel: discord.TextChannel):
 		self.participants = []
 		self.bot = bot
+		self.config: Group = config.guild(channel.guild)
 		self.channel = channel
 		self.phase = GamePhase.INACTIVE
 
@@ -37,10 +40,10 @@ class OngoingGame(ABC):
 			title="Signups opened for new game of Minecraft trivia",
 			description="React to this message in order to join. You have 30 seconds to signup.",
 		)
-		embed.timestamp = datetime.now() + timedelta(seconds=30)
+		embed.timestamp = datetime.now()
 		self.signup_message = await self.channel.send(embed=embed)
 		await self.signup_message.add_reaction(constants.POSITIVE_REACTION)
-		await asyncio.sleep(30)
+		await asyncio.sleep(await self.config.join_timeout())
 		embed.description = "Signups are now closed. Wait for the game to finish to start a new one."
 		await self.signup_message.edit(embed=embed)
 		self.participants = await utils.get_participants((await self.channel.fetch_message(self.signup_message.id)).reactions)
@@ -59,7 +62,7 @@ class OngoingGame(ABC):
 		await self.channel.send(embed=embed)
 
 	async def gameloop(self):
-		for i in range(5):
+		for i in range(2):#todo
 			await self.single_round(i)
 		await self.conclude_game()
 
@@ -75,7 +78,7 @@ class OngoingGame(ABC):
 				return False
 			return True
 
-		until = datetime.now() + timedelta(seconds=60)
+		until = datetime.now() + timedelta(seconds=await self.config.guess_timeout())
 		while True:
 			try:
 				mes = await self.bot.wait_for('message', check=check, timeout=(until - datetime.now()).total_seconds())
@@ -108,11 +111,27 @@ class OngoingGame(ABC):
 class PointBasedGame(OngoingGame, ABC):
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
-		self.points = {}
+		self.points: typing.Dict[discord.User, int] = {}
+
+	async def conclude_game(self):
+		async with self.config.total_scores() as total_scores:
+			for user, points in self.points.items():
+				uid = str(user.id)
+				if uid not in total_scores:
+					total_scores[uid] = 0
+				total_scores[uid] += points
+		async with self.config.high_scores() as high_scores:
+			for user, points in self.points.items():
+				uid = str(user.id)
+				if uid not in high_scores:
+					high_scores[uid] = points
+				else:
+					high_scores[uid] = max(high_scores[uid], points)
+		return await super().conclude_game()
 
 	@property
 	def ranks(self) -> typing.List[typing.Tuple[int, typing.Tuple[discord.User, int]]]:
-		return list(enumerate(reversed(sorted(self.points.items(), key=lambda x: x[1]))))
+		return utils.create_leaderboard(self.points)
 
 	async def start_game(self):
 		for u in self.participants:
@@ -120,7 +139,7 @@ class PointBasedGame(OngoingGame, ABC):
 		return await super().start_game()
 
 	def leaderboard(self) -> str:
-		return "\n".join(f"**{rank + 1}.** {user.mention} - {points}" for rank, (user, points) in self.ranks)
+		return utils.format_leaderboard(self.ranks)
 
 
 class XDGame(PointBasedGame):
@@ -184,5 +203,8 @@ class CraftingGame(PointBasedGame):
 			return len(items_left_to_find) == 0
 
 		await self.wait_for_participant_messages(check)
-		embed.description += "\n\nAll items found"
-		await self.channel.edit(embed=embed)
+		for ingredient in items_left_to_find:
+			item = ingredient.allowed_items[0]
+			embed.description += f"\n{self.get_name(item)} ({ingredient.count}) - Not Found"
+		embed.description += "\n\nDone"
+		await message.edit(embed=embed)

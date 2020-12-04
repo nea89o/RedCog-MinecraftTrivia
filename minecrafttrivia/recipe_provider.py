@@ -18,6 +18,7 @@ class Ingredient:
 
 @dataclass
 class CraftingRecipe:
+	name: str
 	result: str
 	ingredients: typing.List[Ingredient]
 
@@ -53,7 +54,7 @@ class RecipeProvider:
 	def load_all_recipes(self):
 		for recipe_file in recipe_dir.iterdir():
 			with recipe_file.open() as fp:
-				self.load_recipe(fp)
+				self.load_recipe(recipe_file.name.split(".")[0], fp)
 
 	def load_lang(self):
 		with lang_file.open() as fp:
@@ -76,14 +77,12 @@ class RecipeProvider:
 
 	def follow_tags(self, tag: str) -> typing.List[str]:
 		def internal(t):
-			if t == "":
-				print("x")
 			for el in self.tags[t]:
 				if el[0] == '#':
 					for subel in internal(deminecraft(el[1:])):
 						yield subel
 				else:
-					yield el
+					yield deminecraft(el)
 
 		return list(internal(tag))
 
@@ -99,14 +98,19 @@ class RecipeProvider:
 			return self.follow_tags(deminecraft(obj['tag']))
 		raise RuntimeError("Invalid recipe")
 
-	def load_crafting_shapeless(self, data: dict) -> CraftingRecipe:
+	def load_crafting_shapeless(self, name: str, data: dict) -> CraftingRecipe:
 		result = deminecraft(data['result']['item'])
-		ingredients = []
+		ingredient_counts = defaultdict(int)
+		ingredients_content = {}
 		for i in data['ingredients']:
-			ingredients.append(Ingredient(self.parse_ingredient(i), 1))
-		return CraftingRecipe(result, ingredients)
+			ingredient_counts[str(i)] += 1
+			ingredients_content[str(i)] = self.parse_ingredient(i)
+		ingredients = []
+		for ingredient, count in ingredient_counts.items():
+			ingredients.append(Ingredient(ingredients_content[ingredient], count))
+		return CraftingRecipe(name, result, ingredients)
 
-	def load_crafting_shaped(self, data: dict) -> CraftingRecipe:
+	def load_crafting_shaped(self, name: str, data: dict) -> CraftingRecipe:
 		item_counts = defaultdict(int)
 		for row in data['pattern']:
 			for cell in row:
@@ -117,14 +121,14 @@ class RecipeProvider:
 			obj = data['key'][item]
 			ingredients.append(Ingredient(self.parse_ingredient(obj), count))
 		result = deminecraft(data['result']['item'])
-		return CraftingRecipe(result, ingredients)
+		return CraftingRecipe(name, result, ingredients)
 
-	def load_recipe(self, fp):
+	def load_recipe(self, name, fp):
 		data = json.load(fp)
 		loader = 'load_' + deminecraft(data['type'])
 		if not hasattr(self, loader):
 			return
-		recipe = getattr(self, loader)(data)
+		recipe = getattr(self, loader)(name, data)
 		self.recipes.append(recipe)
 
 
