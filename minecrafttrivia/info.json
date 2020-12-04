@@ -11,6 +11,11 @@
 		"minigame"
 	],
 	"min_bot_version": "3.3.10",
+	"min_python_version": [
+		3,
+		8,
+		0
+	],
 	"hidden": false,
 	"disabled": false,
 	"type": "COG"
