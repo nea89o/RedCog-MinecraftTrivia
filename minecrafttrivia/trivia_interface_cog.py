@@ -9,7 +9,8 @@ from . import utils
 from .game import OngoingGame, CraftingGame, GamePhase
 
 
-class TriviaInterfaceCog(commands.Cog):
+class TriviaInterfaceCog(commands.Cog, name="MinecraftTrivia"):
+
 	def __init__(self, *args, **kwargs):
 		super().__init__(*args, **kwargs)
 		self.config = Config.get_conf(self, identifier=262200644)
@@ -18,8 +19,10 @@ class TriviaInterfaceCog(commands.Cog):
 			join_timeout=30,
 			guess_timeout=60,
 			round_count=10,
+			min_players=2,
 			total_scores={},
 			high_scores={},
+			current_winstreak={},
 		)
 		self.active_games_per_channel: typing.Dict[int, OngoingGame] = {}
 
@@ -35,19 +38,31 @@ class TriviaInterfaceCog(commands.Cog):
 
 	@commands.group(aliases=["mctrivia", "mct"], invoke_without_command=True)
 	@guild_only()
-	async def minecrafttrivia(self, ctx: commands.GuildContext):
+	async def minecrafttrivia(self, ctx: commands.GuildContext, *, extra=""):
 		"""Starts a game of minecraft trivia"""
+		if extra:
+			await ctx.send("Invalid subcommand.")
 		game = self.get_game(ctx.channel)
 		if game:
 			return await ctx.send("Game already started.")
 		game = self.create_game(ctx.bot, ctx.channel)
 		await game.start_signup()
 
+	@minecrafttrivia.command(aliases=["now"])
+	@guild_only()
+	@checks.mod()
+	async def startnow(self, ctx: commands.GuildContext):
+		game = self.get_game(ctx.channel)
+		if not game:
+			return await ctx.send("No game running")
+		await game.start_game()
+
 	@minecrafttrivia.group(aliases=["config"], invoke_without_command=True)
 	@guild_only()
 	@checks.admin()
 	async def set(self, ctx: commands.GuildContext):
-		await ctx.send("Available config options: join_timeout guess_timeout round_count")
+		"""Sets config options. execute without arguments to see all options"""
+		await ctx.send("Available config options: join_timeout guess_timeout round_count min_players")
 
 	@set.command(aliases=["join"])
 	@guild_only()
@@ -59,6 +74,17 @@ class TriviaInterfaceCog(commands.Cog):
 			await ctx.send(f"Set `join_timeout` to `{to}`")
 		else:
 			await ctx.send(f"`join_timeout` is `{await c.join_timeout()}`")
+
+	@set.command(aliases=["players"])
+	@guild_only()
+	@checks.admin()
+	async def min_players(self, ctx: commands.GuildContext, to: int = None):
+		c = self.config.guild(ctx.guild)
+		if to:
+			await c.min_players.set(to)
+			await ctx.send(f"Set `min_players` to `{to}`")
+		else:
+			await ctx.send(f"`min_players` is `{await c.min_players()}`")
 
 	@set.command(aliases=["guess"])
 	@guild_only()
@@ -85,6 +111,7 @@ class TriviaInterfaceCog(commands.Cog):
 	@minecrafttrivia.command(aliases=["high"])
 	@guild_only()
 	async def highscore(self, ctx: commands.GuildContext):
+		"""Show single-round highscore leaderboard"""
 		high_scores = await self.config.guild(ctx.guild).high_scores()
 		await ctx.send(embed=discord.Embed(
 			title=f"MC Trivia Highscores for {ctx.guild.name}",
@@ -93,14 +120,25 @@ class TriviaInterfaceCog(commands.Cog):
 	@minecrafttrivia.command(aliases=["lead", "total"])
 	@guild_only()
 	async def leaderboard(self, ctx: commands.GuildContext):
+		"""Show total summed up highscore leaderboard"""
 		total_scores = await self.config.guild(ctx.guild).total_scores()
 		await ctx.send(embed=discord.Embed(
 			title=f"MC Trivia Leaderboard for {ctx.guild.name}",
 			description=utils.format_leaderboard(utils.create_leaderboard(total_scores))
 		))
 
+	@minecrafttrivia.command(aliases=["win"])
+	@guild_only()
+	async def winstreak(self, ctx: commands.GuildContext):
+		winstreaks = await self.config.guild(ctx.guild).current_winstreak()
+		await ctx.send(embed=discord.Embed(
+			title=f"MC Trivia Current Winstreaks in {ctx.guild.name}",
+			description=utils.format_leaderboard(utils.create_leaderboard(winstreaks))
+		))
+
 	@minecrafttrivia.command()
 	async def info(self, ctx: commands.Context):
+		"""Show info about this cog"""
 		embed = discord.Embed(
 			title="MC Trivia Cog by romangraef89",
 			description="This cog allows you to compete against your friends in a race to guess minecraft crafting recipes the fastest"

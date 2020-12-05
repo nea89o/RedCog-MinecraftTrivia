@@ -20,6 +20,8 @@ Guess minecraft crafting recipes the fastest.
 [p]minecrafttrivia high - Show highscores
 [p]minecrafttrivia config - Set timeouts / round counts. (ADMIN)
 [p]minecrafttrivia lead - Show total score leaderboard
+[p]minecrafttrivia winstreak - Show current winstreaks
+[p]minecrafttrivia startnow - Skip the join timer and start a game now
 ```
 
 ## Legal Notice

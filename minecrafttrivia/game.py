@@ -26,6 +26,7 @@ class OngoingGame(ABC):
 	channel: discord.TextChannel
 	phase: GamePhase
 	signup_message: discord.Message
+	signup_embed: discord.Embed
 
 	def __init__(self, bot: Red, config: Config, channel: discord.TextChannel):
 		self.participants = []
@@ -37,22 +38,32 @@ class OngoingGame(ABC):
 	async def start_signup(self):
 		self.phase = GamePhase.SIGNUP
 		join_timeout = await self.config.join_timeout()
-		embed = discord.Embed(
+		self.signup_embed = discord.Embed(
 			title="Signups opened for new game of Minecraft trivia",
 			description=f"React to this message in order to join. You have {join_timeout} seconds to signup.",
 		)
-		embed.timestamp = datetime.now()
-		self.signup_message = await self.channel.send(embed=embed)
+		self.signup_embed.timestamp = datetime.now()
+		self.signup_message = await self.channel.send(embed=self.signup_embed)
 		await self.signup_message.add_reaction(constants.POSITIVE_REACTION)
 		await asyncio.sleep(join_timeout)
-		embed.description = "Signups are now closed. Wait for the game to finish to start a new one."
-		await self.signup_message.edit(embed=embed)
-		self.participants = await utils.get_participants((await self.channel.fetch_message(self.signup_message.id)).reactions)
-		await self.start_game()
+		if self.phase == GamePhase.SIGNUP:
+			await self.start_game()
 
 	async def start_game(self):
 		self.phase = GamePhase.RUNNING
+		self.signup_embed.description = "Signups are now closed. Wait for the game to finish to start a new one."
+		self.participants = await utils.get_participants((await self.channel.fetch_message(self.signup_message.id)).reactions)
+		if len(self.participants) < await self.config.min_players():
+			self.signup_embed.description = "Too few players to start game."
+			await self.signup_message.edit(embed=self.signup_embed)
+			self.phase = GamePhase.FINISHED
+			return
+		await self.signup_message.edit(embed=self.signup_embed)
+		await self.starting_game()
 		await self.gameloop()
+
+	async def starting_game(self):
+		pass
 
 	async def conclude_game(self):
 		self.phase = GamePhase.FINISHED
@@ -128,16 +139,27 @@ class PointBasedGame(OngoingGame, ABC):
 					high_scores[uid] = points
 				else:
 					high_scores[uid] = max(high_scores[uid], points)
+		async with self.config.current_winstreak() as current_winstreak:
+			sup = list(reversed(sorted(self.points.items(), key=lambda x: x[1])))
+			winner_id = str(sup[0][0].id)
+			if winner_id in current_winstreak:
+				current_winstreak[winner_id] += 1
+			else:
+				current_winstreak[winner_id] = 1
+			for user, points in sup[1:]:
+				uid = str(user.id)
+				current_winstreak[uid] = 0
 		return await super().conclude_game()
 
 	@property
 	def ranks(self) -> typing.List[typing.Tuple[int, typing.Tuple[discord.User, int]]]:
 		return utils.create_leaderboard(self.points)
 
-	async def start_game(self):
+	async def starting_game(self):
 		for u in self.participants:
 			self.points[u] = 0
-		return await super().start_game()
+
+		await super().starting_game()
 
 	def leaderboard(self) -> str:
 		return utils.format_leaderboard(self.ranks)
