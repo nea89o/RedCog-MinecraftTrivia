@@ -98,3 +98,14 @@ class TriviaInterfaceCog(commands.Cog):
 			title=f"MC Trivia Leaderboard for {ctx.guild.name}",
 			description=utils.format_leaderboard(utils.create_leaderboard(total_scores))
 		))
+
+	@minecrafttrivia.command()
+	async def info(self, ctx: commands.Context):
+		embed = discord.Embed(
+			title="MC Trivia Cog by romangraef89",
+			description="This cog allows you to compete against your friends in a race to guess minecraft crafting recipes the fastest"
+		)
+		embed.add_field(name="Github / Source", value="[romangraef89/RedCog-MinecraftTrivia](https://github.com/romangraef/RedCog-MinecraftTrivia)", inline=False)
+		embed.add_field(name="Issue Tracker", value="[Click here](https://github.com/romangraef/RedCog-MinecraftTrivia/issues)", inline=False)
+		embed.add_field(name="Minecraft Version", value="1.16 (Open an issue if a newer version exists)", inline=False)
+		await ctx.send(embed=embed)
