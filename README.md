@@ -20,3 +20,9 @@ Guess minecraft crafting recipes the fastest.
 [p]minecrafttrivia high - Show highscores
 [p]minecrafttrivia lead - Show total score leaderboard
 ```
+
+## Legal Notice
+
+I DO NOT OWN ANY OF THE FILES IN `minecrafttrivia/mcdata`. Those are provided by Mojang / Microsoft as part of minecraft.
+
+See `LICENSE` for any other files in this repo.
