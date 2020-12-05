@@ -17,7 +17,7 @@ async def get_participants(reactions: typing.List[discord.Reaction]) -> typing.L
 
 
 def format_leaderboard(points: typing.List[typing.Tuple[int, typing.Tuple[typing.Union[discord.User, int], int]]]) -> str:
-	return "\n".join(f"**{rank + 1}.** {user.mention if hasattr(user, 'mention') else '<@' + str(user) + '>'} - {points}" for rank, (user, points) in points)
+	return "\n".join(f"**{rank + 1}.** {user.mention if hasattr(user, 'mention') else '<@' + str(user) + '>'} - {points}" for rank, (user, points) in points[:20])
 
 
 _T = typing.TypeVar("_T", discord.User, int)

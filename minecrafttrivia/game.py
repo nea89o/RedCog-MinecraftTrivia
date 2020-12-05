@@ -36,14 +36,15 @@ class OngoingGame(ABC):
 
 	async def start_signup(self):
 		self.phase = GamePhase.SIGNUP
+		join_timeout = await self.config.join_timeout()
 		embed = discord.Embed(
 			title="Signups opened for new game of Minecraft trivia",
-			description="React to this message in order to join. You have 30 seconds to signup.",
+			description=f"React to this message in order to join. You have {join_timeout} seconds to signup.",
 		)
 		embed.timestamp = datetime.now()
 		self.signup_message = await self.channel.send(embed=embed)
 		await self.signup_message.add_reaction(constants.POSITIVE_REACTION)
-		await asyncio.sleep(await self.config.join_timeout())
+		await asyncio.sleep(join_timeout)
 		embed.description = "Signups are now closed. Wait for the game to finish to start a new one."
 		await self.signup_message.edit(embed=embed)
 		self.participants = await utils.get_participants((await self.channel.fetch_message(self.signup_message.id)).reactions)
@@ -62,7 +63,7 @@ class OngoingGame(ABC):
 		await self.channel.send(embed=embed)
 
 	async def gameloop(self):
-		for i in range(2):#todo
+		for i in range(await self.config.round_count()):
 			await self.single_round(i)
 		await self.conclude_game()
 
